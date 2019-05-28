@@ -39,7 +39,6 @@ final class UserToken: PostgreSQLModel {
 }
 
 extension UserToken {
-    /// Fluent relation to the user that owns this token.
     var user: Parent<UserToken, User> {
         return parent(\.userID)
     }

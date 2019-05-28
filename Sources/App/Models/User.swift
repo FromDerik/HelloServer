@@ -11,6 +11,9 @@ final class User: PostgreSQLModel {
     /// User's full name.
     var name: String
     
+    /// User's username
+    var username: String
+    
     /// User's email address.
     var email: String
     
@@ -18,9 +21,10 @@ final class User: PostgreSQLModel {
     var passwordHash: String
     
     /// Creates a new `User`.
-    init(id: Int? = nil, name: String, email: String, passwordHash: String) {
+    init(id: Int? = nil, name: String, username: String, email: String, passwordHash: String) {
         self.id = id
         self.name = name
+        self.username = username
         self.email = email
         self.passwordHash = passwordHash
     }
@@ -52,9 +56,11 @@ extension User: Migration {
         return PostgreSQLDatabase.create(User.self, on: conn) { builder in
             builder.field(for: \.id, isIdentifier: true)
             builder.field(for: \.name)
+            builder.field(for: \.username)
             builder.field(for: \.email)
             builder.field(for: \.passwordHash)
             builder.unique(on: \.email)
+            builder.unique(on: \.username)
         }
     }
 }

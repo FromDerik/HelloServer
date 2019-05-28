@@ -4,37 +4,67 @@ import FluentPostgreSQL
 
 /// Creates new users and logs them in.
 final class UserController {
-    /// Logs a user in, returning a token for accessing protected endpoints.
-    func login(_ req: Request) throws -> Future<UserToken> {
-        // get user auth'd by basic auth middleware
-        let user = try req.requireAuthenticated(User.self)
-        
-        // create new token for this user
-        let token = try UserToken.create(userID: user.requireID())
-        
-        // save and return token
-        return token.save(on: req)
-    }
     
     /// Creates a new user.
-    func create(_ req: Request) throws -> Future<UserResponse> {
+    func register(_ req: Request) throws -> Future<UserResponse> {
         // decode request content
-        return try req.content.decode(CreateUserRequest.self).flatMap { user -> Future<User> in
-            // verify that passwords match
-            guard user.password == user.verifyPassword else {
-                throw Abort(.badRequest, reason: "Password and verification must match.")
+        return try req.content.decode(CreateUserRequest.self).flatMap { user in
+            return User.query(on: req).filter(\.email == user.email).first().flatMap { fetchedUser in
+                if fetchedUser != nil {
+                    throw Abort(.badRequest, reason: "Email already in use.")
+                }
+                // verify that passwords match
+                guard user.password == user.verifyPassword else {
+                    throw Abort(.badRequest, reason: "Password and verification must match.")
+                }
+                
+                // hash user's password using BCrypt
+                let hash = try BCrypt.hash(user.password)
+                // save new user
+                let newUser = User(id: nil, name: user.name, username: user.username, email: user.email, passwordHash: hash)
+                
+                return newUser.save(on: req).map { savedUser in
+                    return try UserResponse(id: savedUser.requireID(), username: savedUser.name, email: savedUser.email)
+                }
             }
-            
-            // hash user's password using BCrypt
-            let hash = try BCrypt.hash(user.password)
-            // save new user
-            return User(id: nil, name: user.name, email: user.email, passwordHash: hash)
-                .save(on: req)
-        }.map { user in
-            // map to public user response (omits password hash)
-            return try UserResponse(id: user.requireID(), name: user.name, email: user.email)
         }
     }
+    
+    /// login a User
+    func login(_ req: Request) throws -> Future<UserToken> {
+        return try req.content.decode(User.self).flatMap { user in
+            return User.query(on: req).filter(\.email == user.email).first().flatMap { fetchedUser in
+                guard let savedUser = fetchedUser else {
+                    throw Abort(.badRequest, reason: "User does not exist")
+                }
+                
+                let hasher = try req.make(BCryptDigest.self)
+                if try hasher.verify(user.passwordHash, created: savedUser.passwordHash) {
+                    return try UserToken
+                        .query(on: req)
+                        .filter(\UserToken.userID == savedUser.requireID())
+                        .delete()
+                        .flatMap { _ in
+                            let token = try UserToken.create(userID: user.requireID())
+                            return token.save(on: req)
+                        }
+                } else {
+                    throw Abort(.unauthorized)
+                }
+            }
+        }
+    }
+    
+    func list(_ req: Request) throws -> Future<[UserResponse]> {
+        let _ = try req.requireAuthenticated(User.self)
+        
+        return User.query(on: req).all().map { users in
+            return try users.map { user in
+                return try UserResponse(id: user.requireID(), username: user.username, email: user.email)
+            }
+        }
+    }
+    
 }
 
 // MARK: Content
@@ -43,6 +73,9 @@ final class UserController {
 struct CreateUserRequest: Content {
     /// User's full name.
     var name: String
+    
+    /// User's username.
+    var username: String
     
     /// User's email address.
     var email: String
@@ -60,8 +93,8 @@ struct UserResponse: Content {
     /// Not optional since we only return users that exist in the DB.
     var id: Int
     
-    /// User's full name.
-    var name: String
+    /// User's username.
+    var username: String
     
     /// User's email address.
     var email: String
