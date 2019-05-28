@@ -1,6 +1,6 @@
 import Crypto
 import Vapor
-import FluentSQLite
+import FluentPostgreSQL
 
 /// Creates new users and logs them in.
 final class UserController {

@@ -1,9 +1,9 @@
 import Authentication
-import FluentSQLite
+import FluentPostgreSQL
 import Vapor
 
 /// A registered user, capable of owning todo items.
-final class User: SQLiteModel {
+final class User: PostgreSQLModel {
     /// User's unique identifier.
     /// Can be `nil` if the user has not been saved yet.
     var id: Int?
@@ -48,8 +48,8 @@ extension User: TokenAuthenticatable {
 /// Allows `User` to be used as a Fluent migration.
 extension User: Migration {
     /// See `Migration`.
-    static func prepare(on conn: SQLiteConnection) -> Future<Void> {
-        return SQLiteDatabase.create(User.self, on: conn) { builder in
+    static func prepare(on conn: PostgreSQLConnection) -> Future<Void> {
+        return PostgreSQLDatabase.create(User.self, on: conn) { builder in
             builder.field(for: \.id, isIdentifier: true)
             builder.field(for: \.name)
             builder.field(for: \.email)
