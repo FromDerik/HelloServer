@@ -32,7 +32,7 @@ final class UserController {
     
     /// login a User
     func login(_ req: Request) throws -> Future<UserToken> {
-        return try req.content.decode(User.self).flatMap { user in
+        return try req.content.decode(CreateUserRequest.self).flatMap { user in
             return User.query(on: req).filter(\.email == user.email).first().flatMap { fetchedUser in
                 guard let savedUser = fetchedUser else {
                     throw Abort(.badRequest, reason: "User does not exist")
