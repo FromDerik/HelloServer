@@ -38,10 +38,9 @@ final class UserController {
                     throw Abort(.badRequest, reason: "User does not exist")
                 }
                 
-                let hasher = try req.make(BCryptDigest.self)
-                let passwordHash = try hasher.hash(user.password)
+                let passwordHash = try BCrypt.hash(user.password)
                 
-                if try hasher.verify(passwordHash, created: savedUser.passwordHash) {
+                if try BCrypt.verify(passwordHash, created: savedUser.passwordHash) {
                     return try UserToken
                         .query(on: req)
                         .filter(\UserToken.userID == savedUser.requireID())
