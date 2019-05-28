@@ -70,3 +70,19 @@ extension User: Content { }
 
 /// Allows `User` to be used as a dynamic parameter in route definitions.
 extension User: Parameter { }
+
+class UserMigration: PostgreSQLMigration {
+    static func prepare(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+        return PostgreSQLDatabase.update(User.self, on: conn, closure: { builder in
+            builder.field(for: \.username)
+            builder.unique(on: \.username)
+        })
+    }
+    
+    static func revert(on conn: PostgreSQLConnection) -> EventLoopFuture<Void> {
+        return PostgreSQLDatabase.update(User.self, on: conn, closure: { builder in
+            builder.deleteField(for: \.username)
+            builder.deleteUnique(from: \.username)
+        })
+    }
+}
