@@ -32,20 +32,22 @@ final class UserController {
     
     /// login a User
     func login(_ req: Request) throws -> Future<UserToken> {
-        return try req.content.decode(CreateUserRequest.self).flatMap { user in
+        return try req.content.decode(LoginUserRequest.self).flatMap { user in
             return User.query(on: req).filter(\.email == user.email).first().flatMap { fetchedUser in
                 guard let savedUser = fetchedUser else {
                     throw Abort(.badRequest, reason: "User does not exist")
                 }
                 
                 let hasher = try req.make(BCryptDigest.self)
-                if try hasher.verify(user.passwordHash, created: savedUser.passwordHash) {
+                let passwordHash = try hasher.hash(user.password)
+                
+                if try hasher.verify(passwordHash, created: savedUser.passwordHash) {
                     return try UserToken
                         .query(on: req)
                         .filter(\UserToken.userID == savedUser.requireID())
                         .delete()
                         .flatMap { _ in
-                            let token = try UserToken.create(userID: user.requireID())
+                            let token = try UserToken.create(userID: savedUser.requireID())
                             return token.save(on: req)
                         }
                 } else {
@@ -68,6 +70,12 @@ final class UserController {
 }
 
 // MARK: Content
+
+struct LoginUserRequest: Content {
+    var email: String
+    
+    var password: String
+}
 
 /// Data required to create a user.
 struct CreateUserRequest: Content {
