@@ -40,7 +40,7 @@ final class UserController {
                 
                 let passwordHash = try BCrypt.hash(user.password)
                 
-                if try BCrypt.verify(passwordHash, created: savedUser.passwordHash) {
+                if try BCryptDigest.verify(passwordHash, created: savedUser.passwordHash) {
                     return try UserToken
                         .query(on: req)
                         .filter(\UserToken.userID == savedUser.requireID())
