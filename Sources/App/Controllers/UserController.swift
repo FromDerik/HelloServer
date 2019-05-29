@@ -7,11 +7,19 @@ final class UserController {
     
     /// Creates a new user.
     func register(_ req: Request) throws -> Future<UserResponse> {
-        // decode request content
         return try req.content.decode(CreateUserRequest.self).flatMap { user in
-            return User.query(on: req).filter(\.email == user.email).first().flatMap { fetchedUser in
-                if fetchedUser != nil {
-                    throw Abort(.badRequest, reason: "Email already in use.")
+            return User.query(on: req).group(.or, closure: { (query) in
+                query.filter(\.email == user.email)
+                query.filter(\.username == user.username)
+            }).first().flatMap { fetchedUser in
+                if let u = fetchedUser {
+                    if u.email == user.email && u.username == user.username {
+                        throw Abort(.badRequest, reason: "Email and username already in use.")
+                    } else if u.email == user.email {
+                        throw Abort(.badRequest, reason: "Email already in use.")
+                    } else if u.username == user.username {
+                        throw Abort(.badRequest, reason: "Username already in use.")
+                    }
                 }
                 // verify that passwords match
                 guard user.password == user.verifyPassword else {
@@ -30,10 +38,17 @@ final class UserController {
         }
     }
     
-    /// login a User
+    /// logs in a User
     func login(_ req: Request) throws -> Future<UserToken> {
         return try req.content.decode(LoginUserRequest.self).flatMap { user in
-            return User.query(on: req).filter(\.email == user.email).first().flatMap { fetchedUser in
+            return User.query(on: req).group(.or, closure: { (query) in
+                if let email = user.email {
+                    query.filter(\.email == email)
+                }
+                if let username = user.username {
+                    query.filter(\.username == username)
+                }
+            }).first().flatMap { fetchedUser in
                 guard let savedUser = fetchedUser else {
                     throw Abort(.badRequest, reason: "User does not exist")
                 }
@@ -41,19 +56,47 @@ final class UserController {
                 let hasher = try req.make(BCryptDigest.self)
                 
                 if try hasher.verify(user.password, created: savedUser.passwordHash) {
-                    return try UserToken
-                        .query(on: req)
-                        .filter(\UserToken.userID == savedUser.requireID())
-                        .delete()
-                        .flatMap { _ in
-                            let token = try UserToken.create(userID: savedUser.requireID())
-                            return token.save(on: req)
-                        }
+                    return try UserToken.query(on: req).filter(\UserToken.userID == savedUser.requireID()).delete().flatMap { _ in
+                        let token = try UserToken.create(userID: savedUser.requireID())
+                        return token.save(on: req)
+                    }
                 } else {
                     throw Abort(.unauthorized)
                 }
             }
         }
+    }
+    
+    func logout(_ req: Request) throws -> Future<HTTPResponse> {
+        let user = try req.requireAuthenticated(User.self)
+        
+        return try UserToken.query(on: req).filter(\.userID, .equal, user.requireID()).delete().transform(to: HTTPResponse(status: .ok))
+    }
+    
+    func update(_ req: Request) throws -> Future<UserResponse> {
+        let _ = try req.requireAuthenticated(User.self)
+        
+        return try req.parameters.next(User.self).flatMap { user in
+            return try req.content.decode(UpdateUserRequest.self).flatMap { newUser in
+                user.username = newUser.username ?? user.username
+                user.email = newUser.email ?? user.email
+                user.name = newUser.name ?? user.name
+                
+                return user.save(on: req).map { savedUser in
+                    return try UserResponse(id: savedUser.requireID(), username: savedUser.username, email: savedUser.email)
+                }
+            }
+        }
+    }
+    
+    func delete(_ req: Request) throws -> Future<HTTPStatus> {
+        let _ = try req.requireAuthenticated(User.self)
+        
+        return try req.parameters.next(User.self).flatMap { user in
+            try UserToken.query(on: req).filter(\.userID == user.requireID()).delete().flatMap { _ in
+                return user.delete(on: req)
+            }
+        }.transform(to: .ok)
     }
     
     func list(_ req: Request) throws -> Future<[UserResponse]> {
@@ -70,39 +113,32 @@ final class UserController {
 
 // MARK: Content
 
+// Data required to update a user.
+struct UpdateUserRequest: Content {
+    var email: String?
+    var username: String?
+    var name: String?
+}
+
+// Data required to login a user.
 struct LoginUserRequest: Content {
-    var email: String
-    
+    var email: String?
+    var username: String?
     var password: String
 }
 
 /// Data required to create a user.
 struct CreateUserRequest: Content {
-    /// User's full name.
     var name: String
-    
-    /// User's username.
     var username: String
-    
-    /// User's email address.
     var email: String
-    
-    /// User's desired password.
     var password: String
-    
-    /// User's password repeated to ensure they typed it correctly.
     var verifyPassword: String
 }
 
 /// Public representation of user data.
 struct UserResponse: Content {
-    /// User's unique identifier.
-    /// Not optional since we only return users that exist in the DB.
     var id: Int
-    
-    /// User's username.
     var username: String
-    
-    /// User's email address.
     var email: String
 }

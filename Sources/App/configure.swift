@@ -21,7 +21,12 @@ public func configure(_ config: inout Config, _ env: inout Environment, _ servic
     services.register(middlewares)
 
     // Configure a SQLite database
+    
+    #if DEBUG
+    let postgresqlConfig = PostgreSQLDatabaseConfig(hostname: "localhost", port: 5432, username: "derik", database: "helloserver", password: nil)
+    #else
     let postgresqlConfig = PostgreSQLDatabaseConfig(hostname: "localhost", port: 5432, username: "fromderik", database: "helloserver", password: "dmhb0921")
+    #endif
     let postgresql = PostgreSQLDatabase(config: postgresqlConfig)
 
     // Register the configured SQLite database to the database config.
@@ -33,7 +38,5 @@ public func configure(_ config: inout Config, _ env: inout Environment, _ servic
     var migrations = MigrationConfig()
     migrations.add(model: User.self, database: .psql)
     migrations.add(model: UserToken.self, database: .psql)
-//    migrations.add(migration: UserMigration.self, database: .psql)
     services.register(migrations)
-
 }
