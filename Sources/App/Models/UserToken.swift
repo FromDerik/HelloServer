@@ -14,7 +14,7 @@ final class UserToken: PostgreSQLModel {
     }
     
     /// See `Model`.
-    static var deletedAtKey: TimestampKey? { return \.expiresAt }
+//    static var deletedAtKey: TimestampKey? { return \.expiresAt }
     
     /// UserToken's unique identifier.
     var id: Int?
@@ -26,14 +26,14 @@ final class UserToken: PostgreSQLModel {
     var userID: User.ID
     
     /// Expiration date. Token will no longer be valid after this point.
-    var expiresAt: Date?
+//    var expiresAt: Date?
     
     /// Creates a new `UserToken`.
     init(id: Int? = nil, string: String, userID: User.ID) {
         self.id = id
         self.string = string
         // set token to expire after 5 hours
-        self.expiresAt = Date.init(timeInterval: 60 * 60 * 5, since: .init())
+//        self.expiresAt = Date.init(timeInterval: 60 * 60 * 5, since: .init())
         self.userID = userID
     }
 }
@@ -68,7 +68,7 @@ extension UserToken: Migration {
             builder.field(for: \.id, isIdentifier: true)
             builder.field(for: \.string)
             builder.field(for: \.userID)
-            builder.field(for: \.expiresAt)
+//            builder.field(for: \.expiresAt)
             builder.reference(from: \.userID, to: \User.id)
         }
     }

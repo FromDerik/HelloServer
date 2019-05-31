@@ -5,7 +5,7 @@ import FluentPostgreSQL
 /// Creates new users and logs them in.
 final class UserController {
     
-    func register(_ req: Request) throws -> Future<UserResponse> {
+    func register(_ req: Request) throws -> Future<HTTPResponse> {
         return try req.content.decode(CreateUserRequest.self).flatMap { registerRequest in
             return User.query(on: req).group(.or, closure: { (query) in
                 query.filter(\.email == registerRequest.email)
@@ -27,25 +27,19 @@ final class UserController {
                 
                 let hash = try BCrypt.hash(registerRequest.password)
                 
-                let newUser = User(id: nil, name: registerRequest.name, username: registerRequest.username, email: registerRequest.email, passwordHash: hash)
+                let newUser = User(name: registerRequest.name, username: registerRequest.username, email: registerRequest.email, passwordHash: hash)
                 
-                return newUser.save(on: req).map { savedUser in
-                    return try UserResponse(id: savedUser.requireID(), username: savedUser.name, email: savedUser.email)
-                }
+                return newUser.save(on: req).transform(to: HTTPResponse(status: .ok))
             }
         }
     }
     
     /// logs in a User
-    func login(_ req: Request) throws -> Future<UserToken> {
+    func login(_ req: Request) throws -> Future<UserLoginResponse> {
         return try req.content.decode(LoginUserRequest.self).flatMap { loginRequest in
             return User.query(on: req).group(.or, closure: { (query) in
-                if let email = loginRequest.email {
-                    query.filter(\.email == email)
-                }
-                if let username = loginRequest.username {
-                    query.filter(\.username == username)
-                }
+                query.filter(\.email == loginRequest.name)
+                query.filter(\.username == loginRequest.name)
             }).first().flatMap { fetchedUser in
                 guard let user = fetchedUser else {
                     throw Abort(.badRequest, reason: "User does not exist")
@@ -56,7 +50,9 @@ final class UserController {
                 if try hasher.verify(loginRequest.password, created: user.passwordHash) {
                     return try UserToken.query(on: req).filter(\UserToken.userID == user.requireID()).delete().flatMap { _ in
                         let token = try UserToken.create(userID: user.requireID())
-                        return token.save(on: req)
+                        return token.save(on: req).map { token in
+                            return try UserLoginResponse(id: user.requireID(), name: user.name, username: user.username, email: user.email, token: token)
+                        }
                     }
                 } else {
                     throw Abort(.unauthorized)
@@ -120,8 +116,7 @@ struct UpdateUserRequest: Content {
 
 // Data required to login a user.
 struct LoginUserRequest: Content {
-    var email: String?
-    var username: String?
+    var name: String
     var password: String
 }
 
@@ -139,4 +134,13 @@ struct UserResponse: Content {
     var id: Int
     var username: String
     var email: String
+}
+
+struct UserLoginResponse: Content {
+    var id: Int
+    var name: String
+    var username: String
+    var email: String
+    
+    var token: UserToken
 }
