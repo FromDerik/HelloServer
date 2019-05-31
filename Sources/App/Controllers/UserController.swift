@@ -5,31 +5,29 @@ import FluentPostgreSQL
 /// Creates new users and logs them in.
 final class UserController {
     
-    /// Creates a new user.
     func register(_ req: Request) throws -> Future<UserResponse> {
-        return try req.content.decode(CreateUserRequest.self).flatMap { user in
+        return try req.content.decode(CreateUserRequest.self).flatMap { registerRequest in
             return User.query(on: req).group(.or, closure: { (query) in
-                query.filter(\.email == user.email)
-                query.filter(\.username == user.username)
+                query.filter(\.email == registerRequest.email)
+                query.filter(\.username == registerRequest.username)
             }).first().flatMap { fetchedUser in
                 if let u = fetchedUser {
-                    if u.email == user.email && u.username == user.username {
+                    if u.email == registerRequest.email && u.username == registerRequest.username {
                         throw Abort(.badRequest, reason: "Email and username already in use.")
-                    } else if u.email == user.email {
+                    } else if u.email == registerRequest.email {
                         throw Abort(.badRequest, reason: "Email already in use.")
-                    } else if u.username == user.username {
+                    } else if u.username == registerRequest.username {
                         throw Abort(.badRequest, reason: "Username already in use.")
                     }
                 }
-                // verify that passwords match
-                guard user.password == user.verifyPassword else {
+                
+                guard registerRequest.password == registerRequest.verifyPassword else {
                     throw Abort(.badRequest, reason: "Password and verification must match.")
                 }
                 
-                // hash user's password using BCrypt
-                let hash = try BCrypt.hash(user.password)
-                // save new user
-                let newUser = User(id: nil, name: user.name, username: user.username, email: user.email, passwordHash: hash)
+                let hash = try BCrypt.hash(registerRequest.password)
+                
+                let newUser = User(id: nil, name: registerRequest.name, username: registerRequest.username, email: registerRequest.email, passwordHash: hash)
                 
                 return newUser.save(on: req).map { savedUser in
                     return try UserResponse(id: savedUser.requireID(), username: savedUser.name, email: savedUser.email)
@@ -40,24 +38,24 @@ final class UserController {
     
     /// logs in a User
     func login(_ req: Request) throws -> Future<UserToken> {
-        return try req.content.decode(LoginUserRequest.self).flatMap { user in
+        return try req.content.decode(LoginUserRequest.self).flatMap { loginRequest in
             return User.query(on: req).group(.or, closure: { (query) in
-                if let email = user.email {
+                if let email = loginRequest.email {
                     query.filter(\.email == email)
                 }
-                if let username = user.username {
+                if let username = loginRequest.username {
                     query.filter(\.username == username)
                 }
             }).first().flatMap { fetchedUser in
-                guard let savedUser = fetchedUser else {
+                guard let user = fetchedUser else {
                     throw Abort(.badRequest, reason: "User does not exist")
                 }
                 
                 let hasher = try req.make(BCryptDigest.self)
                 
-                if try hasher.verify(user.password, created: savedUser.passwordHash) {
-                    return try UserToken.query(on: req).filter(\UserToken.userID == savedUser.requireID()).delete().flatMap { _ in
-                        let token = try UserToken.create(userID: savedUser.requireID())
+                if try hasher.verify(loginRequest.password, created: user.passwordHash) {
+                    return try UserToken.query(on: req).filter(\UserToken.userID == user.requireID()).delete().flatMap { _ in
+                        let token = try UserToken.create(userID: user.requireID())
                         return token.save(on: req)
                     }
                 } else {
@@ -77,10 +75,10 @@ final class UserController {
         let _ = try req.requireAuthenticated(User.self)
         
         return try req.parameters.next(User.self).flatMap { user in
-            return try req.content.decode(UpdateUserRequest.self).flatMap { newUser in
-                user.username = newUser.username ?? user.username
-                user.email = newUser.email ?? user.email
-                user.name = newUser.name ?? user.name
+            return try req.content.decode(UpdateUserRequest.self).flatMap { updateRequest in
+                user.username = updateRequest.username ?? user.username
+                user.email = updateRequest.email ?? user.email
+                user.name = updateRequest.name ?? user.name
                 
                 return user.save(on: req).map { savedUser in
                     return try UserResponse(id: savedUser.requireID(), username: savedUser.username, email: savedUser.email)
