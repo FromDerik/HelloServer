@@ -7,7 +7,7 @@ final class Post: PostgreSQLModel {
     var id: Int?
     var userID: User.ID
     var post: String
-    var date: String
+    var date: Date
     
     init(id: Int? = nil, post: String, userID: User.ID) {
         self.id = id

@@ -13,4 +13,8 @@ public func routes(_ router: Router) throws {
     authedRoutes.patch("users", User.parameter, use: userController.update)
     authedRoutes.delete("users", User.parameter, use: userController.delete)
     authedRoutes.get("users", use: userController.list)
+    
+    let postController = PostController()
+    authedRoutes.post("posts", "create", use: postController.create)
+    authedRoutes.get("posts", use: postController.list)
 }
