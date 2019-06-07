@@ -77,7 +77,7 @@ final class UserController {
                 user.name = updateRequest.name ?? user.name
                 
                 return user.save(on: req).map { savedUser in
-                    return try UserResponse(id: savedUser.requireID(), username: savedUser.username, email: savedUser.email)
+                    return try UserResponse(id: savedUser.requireID(), name: savedUser.name, username: savedUser.username, email: savedUser.email)
                 }
             }
         }
@@ -98,7 +98,7 @@ final class UserController {
         
         return User.query(on: req).all().map { users in
             return try users.map { user in
-                return try UserResponse(id: user.requireID(), username: user.username, email: user.email)
+                return try UserResponse(id: user.requireID(), name: user.name, username: user.username, email: user.email)
             }
         }
     }
@@ -132,6 +132,7 @@ struct CreateUserRequest: Content {
 /// Public representation of user data.
 struct UserResponse: Content {
     var id: Int
+    var name: String
     var username: String
     var email: String
 }

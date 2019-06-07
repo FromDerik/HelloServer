@@ -6,13 +6,13 @@ final class Post: PostgreSQLModel {
     
     var id: Int?
     var userID: User.ID
-    var post: String
+    var caption: String
     var date: Date
     
-    init(id: Int? = nil, post: String, userID: User.ID) {
+    init(id: Int? = nil, caption: String, userID: User.ID) {
         self.id = id
         self.userID = userID
-        self.post = post
+        self.caption = caption
         self.date = Date()
     }
 }
@@ -28,7 +28,7 @@ extension Post: Migration {
         return PostgreSQLDatabase.create(Post.self, on: conn) { builder in
             builder.field(for: \.id, isIdentifier: true)
             builder.field(for: \.userID)
-            builder.field(for: \.post)
+            builder.field(for: \.caption)
             builder.field(for: \.date)
             builder.reference(from: \.userID, to: \User.id)
         }

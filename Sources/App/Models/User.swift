@@ -18,6 +18,16 @@ final class User: PostgreSQLModel {
     }
 }
 
+extension User {
+    var posts: Children<User, Post> {
+        return children(\.userID)
+    }
+    
+    var friends: Siblings<User, User, UserFriend> {
+        return siblings()
+    }
+}
+
 extension User: PasswordAuthenticatable {
     static var usernameKey: WritableKeyPath<User, String> {
         return \.email

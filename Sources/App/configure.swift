@@ -23,9 +23,18 @@ public func configure(_ config: inout Config, _ env: inout Environment, _ servic
     // Configure a SQLite database
     
     #if Xcode
-    let postgresqlConfig = PostgreSQLDatabaseConfig(hostname: "localhost", port: 5432, username: "derik", database: "helloserver", password: nil)
+    let postgresqlConfig = PostgreSQLDatabaseConfig(
+        hostname: Environment.get("DB_HOSTNAME")!,
+        username: Environment.get("DB_USER")!,
+        database: Environment.get("DB_DATABASE")!
+    )
     #else
-    let postgresqlConfig = PostgreSQLDatabaseConfig(hostname: "localhost", port: 5432, username: "fromderik", database: "helloserver", password: "dmhb0921")
+    let postgresqlConfig = PostgreSQLDatabaseConfig(
+        hostname: Environment.get("DB_HOSTNAME")!,
+        username: Environment.get("DB_USER")!,
+        database: Environment.get("DB_DATABASE")!,
+        password: Environment.get("DB_PASSWORD")!
+    )
     #endif
     let postgresql = PostgreSQLDatabase(config: postgresqlConfig)
 
